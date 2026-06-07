@@ -10,7 +10,7 @@ from pathlib import Path, PurePosixPath
 from typing import Sequence
 
 import docker
-from docker.errors import DockerException
+from docker.errors import DockerException, ImageNotFound
 from docker.models.containers import Container
 
 
@@ -56,6 +56,20 @@ class _DockerBackend:
 
     def create(self) -> None:
         self.client = docker.from_env()
+        self._pull_missing_image()
+
+        self.container = self.client.containers.create(**self._create_options())
+
+    def _pull_missing_image(self) -> None:
+        if self.client is None:
+            return
+
+        try:
+            self.client.images.get(self.image)
+        except ImageNotFound:
+            self.client.images.pull(self.image)
+
+    def _create_options(self) -> dict[str, object]:
         options = {
             "image": self.image,
             "command": self.command,
@@ -69,7 +83,7 @@ class _DockerBackend:
         if self.cpus is not None:
             options["nano_cpus"] = int(self.cpus * 1_000_000_000)
 
-        self.container = self.client.containers.create(**options)
+        return options
 
     def start(self) -> None:
         container = self.require_container()
