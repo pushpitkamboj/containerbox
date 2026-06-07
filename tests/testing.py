@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Callable
+from unittest.mock import patch
 
 import docker
 from docker.errors import DockerException, ImageNotFound, NotFound
@@ -72,6 +73,50 @@ def test_constructor_validation() -> None:
     assert_raises(ValueError, lambda: SandboxSession(runtime="podman"))
     assert_raises(ValueError, lambda: SandboxSession(workdir="workspace"))
     assert_raises(ValueError, lambda: SandboxSession(workdir="/tmp/../workspace"))
+
+
+def test_open_pulls_missing_image_before_create() -> None:
+    events: list[str] = []
+
+    class FakeContainer:
+        id = "fake-container"
+        status = "created"
+
+        def reload(self) -> None:
+            events.append("reload")
+
+        def remove(self, *, force: bool = False) -> None:
+            events.append(f"remove:{force}")
+
+    class FakeImages:
+        def get(self, image: str) -> None:
+            events.append(f"get:{image}")
+            raise ImageNotFound("missing")
+
+        def pull(self, image: str) -> None:
+            events.append(f"pull:{image}")
+
+    class FakeContainers:
+        def create(self, **options: object) -> FakeContainer:
+            events.append(f"create:{options['image']}")
+            return FakeContainer()
+
+    class FakeClient:
+        images = FakeImages()
+        containers = FakeContainers()
+
+        def close(self) -> None:
+            events.append("close")
+
+    with patch("containerbox.session.docker.from_env", return_value=FakeClient()):
+        session = SandboxSession("missing:test")
+        try:
+            session.open()
+            assert session.is_open
+        finally:
+            session.close()
+
+    assert events[:3] == ["get:missing:test", "pull:missing:test", "create:missing:test"]
 
 
 def test_enter_creates_and_exit_removes_container() -> None:
@@ -264,6 +309,7 @@ def assert_result(
 
 TESTS = [
     test_constructor_validation,
+    test_open_pulls_missing_image_before_create,
     test_enter_creates_and_exit_removes_container,
     test_manual_open_close_lifecycle,
     test_exec_result_success_failure_and_timeout,
