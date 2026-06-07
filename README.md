@@ -2,6 +2,8 @@
 
 Minimal Docker-only sandbox for running generated code.
 
+Missing images are pulled automatically before the sandbox is created.
+
 ## Usage
 
 Use the context manager when the sandbox belongs to one block of work:
