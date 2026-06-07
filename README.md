@@ -1,8 +1,6 @@
 # ContainerBox
 
-Minimal Docker-only sandbox for running generated code.
-
-Missing images are pulled automatically before the sandbox is created.
+Minimal docker based sandbox for running generated code and bash commands with uploading files, custom images and donwloading the results.
 
 ## Usage
 
