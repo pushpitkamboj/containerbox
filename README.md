@@ -73,19 +73,35 @@ with SandboxSession("python:3.13-slim") as session:
 
 ## Custom Image
 
-```bash
-docker build -f tests/Dockerfile.node -t containerbox-node-extra:test .
+Create a `Dockerfile` in your own project:
+
+```dockerfile
+FROM node:22-slim
+
+WORKDIR /workspace
+
+RUN npm init -y && npm install slugify
+
+ENV NODE_PATH=/workspace/node_modules
 ```
+
+Build it:
+
+```bash
+docker build -t my-node-sandbox:latest .
+```
+
+Use that image with ContainerBox:
 
 ```python
 from containerbox import SandboxSession
 
 code = """
-const { slug } = require("slugify-mini");
-console.log(slug("Hello from Custom Node Image!"));
+const slugify = require("slugify");
+console.log(slugify("Hello from Custom Node Image!", { lower: true }));
 """
 
-with SandboxSession("containerbox-node-extra:test") as session:
+with SandboxSession("my-node-sandbox:latest") as session:
     result = session.run_code(code, filename="main.js", command=["node", "main.js"])
     print(result.stdout)
 ```
